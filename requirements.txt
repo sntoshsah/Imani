@@ -1,2 +1,4 @@
 fastapi[standard] 
 opencv-python
+pyPDF2
+pdf2image
