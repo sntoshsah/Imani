@@ -1,4 +1,14 @@
-fastapi[standard] 
+easyocr
+email_validator
+numpy
+pandas
+scikit-learn
+scipy
+torch
+torchvision
 opencv-python
-pyPDF2
+fastapi[standard]
+PyPDF2
 pdf2image
+websockets
+sqlalchemy

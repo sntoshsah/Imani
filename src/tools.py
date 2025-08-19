@@ -1,8 +1,11 @@
 import os
 from PyPDF2 import PdfReader, PdfWriter
 import cv2
+import easyocr
 import numpy as np
 from pdf2image import convert_from_path
+import re
+import torch
 
 class ImageEditor:
     def __init__(self, image_path):
@@ -70,6 +73,46 @@ class ImageEditor:
         """
         cv2.imwrite(output_path, self.edited_image)
 
+    # def extract_text_from_image(self):
+    #     """
+    #     Extract text from an image using EasyOCR.
+
+    #     :param image_path: Path to the image file
+    #     :return: Extracted text as a string
+    #     """
+    #     torch.cuda.empty_cache()
+    #     reader = easyocr.Reader(['en'], gpu=False)
+    #     results = reader.readtext(self.edited_image, detail=0)
+    #     text = " ".join(results)
+    #     text = re.sub(r"\s+", " ", text)  # Normalize whitespace
+    #     text = re.sub(r"\n+", "\n", text)  # Normalize newlines
+    #     return text.strip()
+    
+    def preprocess_image(self, max_size=(1024, 1024)):
+        """
+        Resize the image to a manageable size for OCR.
+        """
+        self.image = cv2.resize(self.image, max_size, interpolation=cv2.INTER_AREA)
+
+    def extract_text_from_image(self):
+        """
+        Extract text from the initialized image using EasyOCR.
+
+        :return: Extracted text as a string
+        """
+        self.preprocess_image()  # Preprocess image before OCR
+        try:
+            reader = easyocr.Reader(['en'], gpu=True)
+        except Exception as e:
+            print(f"Falling back to CPU due to: {e}")
+            reader = easyocr.Reader(['en'], gpu=False)
+        results = reader.readtext(self.image, detail=0)
+        text = " ".join(results)
+        text = re.sub(r"\s+", " ", text)
+        text = re.sub(r"\n+", "\n", text)
+        return text.strip()
+    
+    
     def reset(self):
         """
         Reset the edited image to the original.
@@ -149,28 +192,46 @@ class PDFEditor:
         """
         writer = PdfWriter()
         for pdf_path in pdf_paths:
-            if not os.path.exists(pdf_path):
-                raise FileNotFoundError(f"PDF not found at {pdf_path}")
+            # Split concatenated paths if necessary
+            individual_paths = pdf_path.split(",") if isinstance(pdf_path, str) else [pdf_path]
+            for path in individual_paths:
+                if not os.path.exists(path):
+                    raise FileNotFoundError(f"PDF not found at {path}")
 
-            reader = PdfReader(pdf_path)
-            for page in reader.pages:
-                writer.add_page(page)
+                reader = PdfReader(path)
+                for page in reader.pages:
+                    writer.add_page(page)
 
         with open(output_path, "wb") as output_pdf:
             writer.write(output_pdf)
 
+
+    # def extract_text(self):
+    #     """
+    #     Extract text from the PDF.
+
+    #     :return: Extracted text as a string
+    #     """
+    #     reader = PdfReader(self.pdf_path)
+    #     text = ""
+    #     for page in reader.pages:
+    #         text += page.extract_text()
+    #     return text
+
     def extract_text(self):
         """
-        Extract text from the PDF.
+        Extract text from the PDF with preprocessing.
 
-        :return: Extracted text as a string
+        :return: Preprocessed text as a string
         """
         reader = PdfReader(self.pdf_path)
         text = ""
         for page in reader.pages:
-            text += page.extract_text()
-        return text
-
+            page_text = page.extract_text() or ""
+            page_text = re.sub(r"\s+", " ", page_text)  # Normalize whitespace
+            page_text = re.sub(r"\n+", "\n", page_text)  # Normalize newlines
+            text += page_text.strip() + "\n"
+        return text.strip()
 
 if __name__ == "__main__":
     
